@@ -18,9 +18,9 @@ class LinUCBAgent:
             
             theta = A_inv @ self.b[a]
             
-            expected_reward = theta.T @ x
+            expected_reward = (theta.T @ x).item()
             
-            cb = self.alpha * np.sqrt(x.T @ A_inv @ x)
+            cb = self.alpha * np.sqrt((x.T @ A_inv @ x).item())
             
             p[a] = expected_reward + cb
             

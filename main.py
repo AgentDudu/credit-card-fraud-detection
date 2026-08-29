@@ -1,8 +1,6 @@
 from utils.preprocessing import load_and_preprocess_data
 from env.fraud_env import FraudDetectionEnv
-from agents.linucb.py import LinUCBAgent # Note: ensure import matches your file naming!
-# Correction to import above:
-from agents.linucb import LinUCBAgent
+from agents.linucb import LinUCBAgent 
 
 def run_simulation(agent_type="random", steps=20000):
     csv_path = 'data/raw/creditcard.csv'
@@ -14,7 +12,7 @@ def run_simulation(agent_type="random", steps=20000):
     if agent_type == "linucb":
         agent = LinUCBAgent(n_actions=env.action_space.n, 
                             n_features=features.shape[1], 
-                            alpha=0.1)
+                            alpha=0.1) # alpha controls exploration
     
     total_reward = 0
     results_counter = {'TP': 0, 'TN': 0, 'FP': 0, 'FN': 0}
