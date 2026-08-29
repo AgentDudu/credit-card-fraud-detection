@@ -7,6 +7,8 @@ from env.fraud_env import FraudDetectionEnv
 from agents.linucb import LinUCBAgent 
 from agents.neuralucb import NeuralUCBAgent
 from agents.supervised import SupervisedAgent
+from agents.linepsilon import LinEpsilonAgent
+from agents.lints import LinTSAgent
 
 def run_simulation(agent_type="random", steps=20000):
     csv_path = 'data/raw/creditcard.csv'
@@ -19,6 +21,10 @@ def run_simulation(agent_type="random", steps=20000):
         agent = LinUCBAgent(n_actions=env.action_space.n, n_features=features.shape[1], alpha=0.1)
     elif agent_type == "neuralucb":
         agent = NeuralUCBAgent(n_actions=env.action_space.n, n_features=features.shape[1], alpha=0.1)
+    elif agent_type == "lin_epsilon":
+        agent = LinEpsilonAgent(n_actions=env.action_space.n, n_features=features.shape[1], epsilon=0.05)
+    elif agent_type == "lin_ts":
+        agent = LinTSAgent(n_actions=env.action_space.n, n_features=features.shape[1], v=0.1)
     elif agent_type in ["logistic", "random_forest", "xgboost"]:
         agent = SupervisedAgent(model_type=agent_type, retrain_interval=1000)
     
@@ -36,7 +42,7 @@ def run_simulation(agent_type="random", steps=20000):
             
         next_obs, reward, terminated, truncated, info = env.step(action)
         
-        if agent_type in ["linucb", "neuralucb"]:
+        if agent_type in ["linucb", "neuralucb", "lin_epsilon", "lin_ts"]:
             agent.update(action, obs, reward)
         elif agent_type in ["logistic", "random_forest", "xgboost"]:
             agent.update(action, obs, reward, info)
@@ -59,7 +65,7 @@ if __name__ == "__main__":
     results_dir = "results"
     os.makedirs(results_dir, exist_ok=True)
     
-    agents_to_test = ["random_forest", "logistic", "linucb", "xgboost", "neuralucb"]
+    agents_to_test = ["random_forest", "logistic", "xgboost", "lin_epsilon", "lin_ts", "linucb", "neuralucb"]
     histories = {}
     metrics = {}
     
@@ -76,33 +82,33 @@ if __name__ == "__main__":
         }
         
     print("\n--- Saving Simulation Results ---")
-    
     df_histories = pd.DataFrame(histories)
     csv_out_path = os.path.join(results_dir, "reward_histories.csv")
     df_histories.to_csv(csv_out_path, index=False)
-    print(f"[SUCCESS] Saved time-series data to: {csv_out_path}")
     
     json_out_path = os.path.join(results_dir, "metrics_summary.json")
     with open(json_out_path, "w") as f:
         json.dump(metrics, f, indent=4)
-    print(f"[SUCCESS] Saved metrics summary to: {json_out_path}")
-    
+        
     print("\n--- Generating Visualization from Saved Data ---")
     loaded_df = pd.read_csv(csv_out_path)
     
-    plt.figure(figsize=(12, 7))
+    plt.figure(figsize=(13, 8))
+    
     colors = {
         "random_forest": "red",
         "logistic": "orange",
-        "linucb": "purple",
         "xgboost": "blue",
+        "lin_epsilon": "magenta",
+        "lin_ts": "cyan",
+        "linucb": "purple",
         "neuralucb": "green"
     }
     
     for agent in agents_to_test:
         plt.plot(loaded_df[agent], label=agent.upper(), color=colors[agent], linewidth=2)
         
-    plt.title("Cumulative Reward Over Time: Online RL vs Batch Supervised Learning")
+    plt.title("Cumulative Reward: Online RL (Bandits) vs Batch Supervised Learning")
     plt.xlabel("Transactions Processed (Time)")
     plt.ylabel("Cumulative Business Reward ($)")
     plt.legend(loc="upper left")
