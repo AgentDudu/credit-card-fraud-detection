@@ -1,6 +1,7 @@
 from utils.preprocessing import load_and_preprocess_data
 from env.fraud_env import FraudDetectionEnv
 from agents.linucb import LinUCBAgent 
+from agents.neuralucb import NeuralUCBAgent # NEW IMPORT
 
 def run_simulation(agent_type="random", steps=20000):
     csv_path = 'data/raw/creditcard.csv'
@@ -10,9 +11,9 @@ def run_simulation(agent_type="random", steps=20000):
     obs, info = env.reset()
     
     if agent_type == "linucb":
-        agent = LinUCBAgent(n_actions=env.action_space.n, 
-                            n_features=features.shape[1], 
-                            alpha=0.1) # alpha controls exploration
+        agent = LinUCBAgent(n_actions=env.action_space.n, n_features=features.shape[1], alpha=0.1)
+    elif agent_type == "neuralucb":
+        agent = NeuralUCBAgent(n_actions=env.action_space.n, n_features=features.shape[1], alpha=0.1)
     
     total_reward = 0
     results_counter = {'TP': 0, 'TN': 0, 'FP': 0, 'FN': 0}
@@ -27,7 +28,7 @@ def run_simulation(agent_type="random", steps=20000):
             
         next_obs, reward, terminated, truncated, info = env.step(action)
         
-        if agent_type == "linucb":
+        if agent_type in ["linucb", "neuralucb"]:
             agent.update(action, obs, reward)
             
         total_reward += reward
@@ -48,6 +49,5 @@ def run_simulation(agent_type="random", steps=20000):
     print(f"False Negatives (Missed Fraud): {results_counter['FN']}")
 
 if __name__ == "__main__":
-    run_simulation(agent_type="random", steps=20000)
-    
     run_simulation(agent_type="linucb", steps=20000)
+    run_simulation(agent_type="neuralucb", steps=20000)
