@@ -10,6 +10,7 @@ from agents.neuralucb import NeuralUCBAgent
 from agents.supervised import SupervisedAgent
 from agents.linepsilon import LinEpsilonAgent
 from agents.lints import LinTSAgent
+from agents.neuralts import NeuralTSAgent
 
 def calculate_classification_metrics(tp, tn, fp, fn):
     accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
@@ -39,6 +40,8 @@ def run_simulation(agent_type="random", steps=20000):
         agent = LinUCBAgent(n_actions=env.action_space.n, n_features=features.shape[1], alpha=0.1)
     elif agent_type == "neuralucb":
         agent = NeuralUCBAgent(n_actions=env.action_space.n, n_features=features.shape[1], alpha=0.1)
+    elif agent_type == "neural_ts":
+        agent = NeuralTSAgent(n_actions=env.action_space.n, n_features=features.shape[1], v=0.1)
     elif agent_type == "lin_epsilon":
         agent = LinEpsilonAgent(n_actions=env.action_space.n, n_features=features.shape[1], epsilon=0.05)
     elif agent_type == "lin_ts":
@@ -60,7 +63,7 @@ def run_simulation(agent_type="random", steps=20000):
             
         next_obs, reward, terminated, truncated, info = env.step(action)
         
-        if agent_type in ["linucb", "neuralucb", "lin_epsilon", "lin_ts"]:
+        if agent_type in ["linucb", "neuralucb", "lin_epsilon", "lin_ts", "neural_ts"]:
             agent.update(action, obs, reward)
         elif agent_type in ["logistic", "random_forest", "xgboost"]:
             agent.update(action, obs, reward, info)
@@ -92,7 +95,7 @@ if __name__ == "__main__":
     results_dir = "results"
     os.makedirs(results_dir, exist_ok=True)
     
-    agents_to_test = ["random_forest", "logistic", "xgboost", "lin_epsilon", "lin_ts", "linucb", "neuralucb"]
+    agents_to_test = ["random_forest", "logistic", "xgboost", "lin_epsilon", "lin_ts", "linucb", "neuralucb", "neural_ts"]
     histories = {}
     metrics_summary = {}
     
@@ -123,7 +126,8 @@ if __name__ == "__main__":
         "lin_epsilon": "magenta",
         "lin_ts": "cyan",         
         "linucb": "purple",       
-        "neuralucb": "green"      
+        "neuralucb": "green",
+        "neural_ts": "teal"
     }
     
     for agent in agents_to_test:
