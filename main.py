@@ -1,6 +1,7 @@
 import os
 import json
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from utils.preprocessing import load_and_preprocess_data
 from env.fraud_env import FraudDetectionEnv
@@ -9,6 +10,25 @@ from agents.neuralucb import NeuralUCBAgent
 from agents.supervised import SupervisedAgent
 from agents.linepsilon import LinEpsilonAgent
 from agents.lints import LinTSAgent
+
+def calculate_classification_metrics(tp, tn, fp, fn):
+    accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    
+    if precision + recall > 0:
+        f1_score = 2 * (precision * recall) / (precision + recall)
+    else:
+        f1_score = 0.0
+        
+    return {
+        "Accuracy": round(accuracy, 4),
+        "Precision": round(precision, 4),
+        "Recall (Sensitivity)": round(recall, 4),
+        "Specificity": round(specificity, 4),
+        "F1_Score": round(f1_score, 4)
+    }
 
 def run_simulation(agent_type="random", steps=20000):
     csv_path = 'data/raw/creditcard.csv'
@@ -55,11 +75,20 @@ def run_simulation(agent_type="random", steps=20000):
         if terminated:
             break
 
-    print(f"Total Cumulative Reward: {total_reward:.2f}")
-    print(f"True Positives: {results_counter['TP']} | False Positives: {results_counter['FP']}")
-    print(f"True Negatives: {results_counter['TN']} | False Negatives: {results_counter['FN']}")
+    tp, tn, fp, fn = results_counter['TP'], results_counter['TN'], results_counter['FP'], results_counter['FN']
+    class_metrics = calculate_classification_metrics(tp, tn, fp, fn)
     
-    return reward_history, results_counter, total_reward
+    print(f"Total Cumulative Reward: ${total_reward:.2f}")
+    print(f"Confusion Matrix  -> TP: {tp} | TN: {tn} | FP: {fp} | FN: {fn}")
+    print(f"ML Metrics        -> Acc: {class_metrics['Accuracy']} | Precision: {class_metrics['Precision']} | Recall: {class_metrics['Recall (Sensitivity)']} | F1: {class_metrics['F1_Score']}")
+    
+    final_metrics = {
+        "Total_Reward": round(total_reward, 2),
+        **results_counter,
+        **class_metrics
+    }
+    
+    return reward_history, final_metrics
 
 if __name__ == "__main__":
     results_dir = "results"
@@ -67,19 +96,12 @@ if __name__ == "__main__":
     
     agents_to_test = ["random_forest", "logistic", "xgboost", "lin_epsilon", "lin_ts", "linucb", "neuralucb"]
     histories = {}
-    metrics = {}
+    metrics_summary = {}
     
     for agent in agents_to_test:
-        r_hist, counts, final_reward = run_simulation(agent_type=agent, steps=20000)
-        
+        r_hist, final_metrics = run_simulation(agent_type=agent, steps=20000)
         histories[agent] = r_hist
-        metrics[agent] = {
-            "Total_Reward": final_reward,
-            "TP": counts["TP"],
-            "TN": counts["TN"],
-            "FP": counts["FP"],
-            "FN": counts["FN"]
-        }
+        metrics_summary[agent] = final_metrics
         
     print("\n--- Saving Simulation Results ---")
     df_histories = pd.DataFrame(histories)
@@ -88,7 +110,8 @@ if __name__ == "__main__":
     
     json_out_path = os.path.join(results_dir, "metrics_summary.json")
     with open(json_out_path, "w") as f:
-        json.dump(metrics, f, indent=4)
+        json.dump(metrics_summary, f, indent=4)
+    print(f"[SUCCESS] Saved detailed metrics to: {json_out_path}")
         
     print("\n--- Generating Visualization from Saved Data ---")
     loaded_df = pd.read_csv(csv_out_path)
@@ -100,9 +123,9 @@ if __name__ == "__main__":
         "logistic": "orange",
         "xgboost": "blue",
         "lin_epsilon": "magenta",
-        "lin_ts": "cyan",
-        "linucb": "purple",
-        "neuralucb": "green"
+        "lin_ts": "cyan",         
+        "linucb": "purple",       
+        "neuralucb": "green"      
     }
     
     for agent in agents_to_test:
