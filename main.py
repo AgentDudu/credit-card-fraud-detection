@@ -15,7 +15,6 @@ def calculate_classification_metrics(tp, tn, fp, fn):
     accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
     
     if precision + recall > 0:
         f1_score = 2 * (precision * recall) / (precision + recall)
@@ -25,8 +24,7 @@ def calculate_classification_metrics(tp, tn, fp, fn):
     return {
         "Accuracy": round(accuracy, 4),
         "Precision": round(precision, 4),
-        "Recall (Sensitivity)": round(recall, 4),
-        "Specificity": round(specificity, 4),
+        "Recall": round(recall, 4),
         "F1_Score": round(f1_score, 4)
     }
 
