@@ -1,47 +1,17 @@
 import os
 import json
+import random
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.preprocessing import load_and_preprocess_data
-from env.fraud_env import FraudDetectionEnv
-from agents.linucb import LinUCBAgent 
-from agents.neuralucb import NeuralUCBAgent
-from agents.supervised import SupervisedAgent
-from agents.linepsilon import LinEpsilonAgent
-from agents.lints import LinTSAgent
-from agents.neuralts import NeuralTSAgent
 
-def calculate_classification_metrics(tp, tn, fp, fn):
-    accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    
-    if precision + recall > 0:
-        f1_score = 2 * (precision * recall) / (precision + recall)
-    else:
-        f1_score = 0.0
-        
-    return {
-        "Accuracy": round(accuracy, 4),
-        "Precision": round(precision, 4),
-        "Recall": round(recall, 4),
-        "F1_Score": round(f1_score, 4)
-    }
-
-import os
-import json
-import random # NEW
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from utils.preprocessing import load_and_preprocess_data
 from env.fraud_env import FraudDetectionEnv
 from agents.linucb import LinUCBAgent 
 from agents.neuralucb import NeuralUCBAgent
 from agents.neuralts import NeuralTSAgent
 from agents.supervised import SupervisedAgent
-from agents.fed_linucb import FedLinUCBClient, FedLinUCBServer # NEW
+from agents.fed_linucb import FedLinUCBClient, FedLinUCBServer
 
 def calculate_classification_metrics(tp, tn, fp, fn):
     accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
@@ -70,19 +40,25 @@ def run_simulation(agent_type, steps=20000):
     
     is_multi_agent = agent_type in ["isolated_banks", "federated_banks"]
     
+    agent = None
+    clients = None
+    server = None
+    sync_interval = 100 
+    
     if is_multi_agent:
         clients = [FedLinUCBClient(client_id=i, n_actions=env.action_space.n, n_features=n_features, alpha=0.1) for i in range(3)]
         server = FedLinUCBServer(n_actions=env.action_space.n, n_features=n_features)
-        sync_interval = 100
-
+    else:
         if agent_type == "linucb":
             agent = LinUCBAgent(n_actions=env.action_space.n, n_features=n_features, alpha=0.1)
         elif agent_type == "neuralucb":
             agent = NeuralUCBAgent(n_actions=env.action_space.n, n_features=n_features, alpha=0.1)
         elif agent_type == "neural_ts":
             agent = NeuralTSAgent(n_actions=env.action_space.n, n_features=n_features, v=0.1)
-        elif agent_type in ["logistic", "xgboost"]:
+        elif agent_type in ["logistic", "xgboost", "random_forest"]:
             agent = SupervisedAgent(model_type=agent_type, retrain_interval=1000)
+        else:
+            raise ValueError(f"Agent type '{agent_type}' is not recognized. Check your spelling!")
 
     total_reward = 0
     results_counter = {'TP': 0, 'TN': 0, 'FP': 0, 'FN': 0}
@@ -100,7 +76,7 @@ def run_simulation(agent_type, steps=20000):
         action = active_agent.get_action(obs)
         next_obs, reward, terminated, truncated, info = env.step(action)
         
-        if agent_type in ["logistic", "xgboost"]:
+        if agent_type in ["logistic", "xgboost", "random_forest"]:
             active_agent.update(action, obs, reward, info)
         else:
             active_agent.update(action, obs, reward)
@@ -129,7 +105,7 @@ if __name__ == "__main__":
     results_dir = "results"
     os.makedirs(results_dir, exist_ok=True)
     
-    agents_to_test = ["linucb", "isolated_banks", "federated_banks", "neuralucb"]
+    agents_to_test = ["linucb", "isolated_banks", "federated_banks", "neural_ts"]
     
     histories = {}
     metrics_summary = {}
@@ -140,8 +116,10 @@ if __name__ == "__main__":
         metrics_summary[agent] = final_metrics
         
     print("\n--- Saving Simulation Results ---")
+    
     df_histories = pd.DataFrame(histories)
     df_histories.to_csv(os.path.join(results_dir, "reward_histories.csv"), index=False)
+    
     with open(os.path.join(results_dir, "metrics_summary.json"), "w") as f:
         json.dump(metrics_summary, f, indent=4)
         
@@ -149,21 +127,26 @@ if __name__ == "__main__":
     loaded_df = pd.read_csv(os.path.join(results_dir, "reward_histories.csv"))
     
     plt.figure(figsize=(13, 8))
+    
     colors = {
         "linucb": "purple",
         "isolated_banks": "red",
         "federated_banks": "green",
-        "neuralucb": "blue"
+        "neural_ts": "teal"
     }
     
     for agent in agents_to_test:
         plt.plot(loaded_df[agent], label=agent.upper(), color=colors[agent], linewidth=2)
         
-    plt.title("The Value of Federated Learning: Isolated Banks vs Secure Collaboration")
+    plt.title("Federated Contextual Bandits vs Standard Online RL (Credit Card Fraud)")
     plt.xlabel("Transactions Processed (Time)")
     plt.ylabel("Cumulative Business Reward ($)")
     plt.legend(loc="upper left")
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, "federated_comparison.png"))
+    
+    plot_path = os.path.join(results_dir, "federated_comparison.png")
+    plt.savefig(plot_path)
+    print(f"[SUCCESS] Saved plot to: {plot_path}")
+    
     plt.show()
